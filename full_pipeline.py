@@ -61,18 +61,15 @@ NEWSLETTER_FILE = os.getenv("NEWSLETTER_FILE", "News.html")
 def build_post_content(blog_draft, source_url=""):
     """
     Build full HTML for a blog post.
-    Shows AI-generated blog text with a styled source button at the bottom.
+    Uses Odoo-native Bootstrap classes so the button survives Odoo's sanitizer.
     """
     content = f"<p>{blog_draft}</p>"
     if source_url and source_url.strip():
         url = source_url.strip()
         content += (
-            f'<p style="margin-top:28px;text-align:center;">'
+            f'<p class="text-center mt-4">'
             f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-            f'style="display:inline-block;padding:12px 28px;background-color:#2e6da4;'
-            f'color:#ffffff;text-decoration:none;border-radius:50px;font-weight:700;'
-            f'font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,0.2);'
-            f'letter-spacing:0.3px;">'
+            f'class="btn btn-primary btn-lg rounded-pill px-4">'
             f'&#128279; View Original Source &rarr;</a></p>'
         )
     return content
