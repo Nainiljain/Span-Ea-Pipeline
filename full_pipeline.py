@@ -19,7 +19,7 @@ Usage (CLI):
 Required .env:
     ODOO_URL, ODOO_DB, ODOO_USER, ODOO_PASSWORD
     GAS_SCRIPT_ID, SPREADSHEET_ID
-    TOKEN_PICKLE_B64=<base64 token — for deployed Railway environments>
+    TOKEN_PICKLE_B64=<base64 token for Railway>
 """
 
 import os
@@ -43,48 +43,61 @@ if os.path.exists(".env"):
                 key, value = line.split("=", 1)
                 os.environ[key.strip()] = value.strip()
 
-ODOO_URL      = os.getenv("ODOO_URL", "").rstrip("/")
-ODOO_DB       = os.getenv("ODOO_DB", "")
-ODOO_USER     = os.getenv("ODOO_USER", "")
-ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "")
-GAS_SCRIPT_ID = os.getenv("GAS_SCRIPT_ID", "")
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
-CACHE_FILE     = "pipeline_cache.json"
-CSV_FILE       = os.getenv("CSV_FILE", "Events.csv")
+ODOO_URL        = os.getenv("ODOO_URL", "").rstrip("/")
+ODOO_DB         = os.getenv("ODOO_DB", "")
+ODOO_USER       = os.getenv("ODOO_USER", "")
+ODOO_PASSWORD   = os.getenv("ODOO_PASSWORD", "")
+GAS_SCRIPT_ID   = os.getenv("GAS_SCRIPT_ID", "")
+SPREADSHEET_ID  = os.getenv("SPREADSHEET_ID", "")
+CACHE_FILE      = "pipeline_cache.json"
+CSV_FILE        = os.getenv("CSV_FILE", "Events.csv")
 NEWSLETTER_FILE = os.getenv("NEWSLETTER_FILE", "News.html")
 
 
 # ─────────────────────────────────────────────────────────
-# SECTION 0B: GOOGLE CREDENTIALS
+# SECTION 0B: SOURCE BUTTON HELPER
+# ─────────────────────────────────────────────────────────
+
+def build_post_content(blog_draft, source_url=""):
+    """
+    Build full HTML for a blog post.
+    Appends a styled blue 'View Original Source' button when a URL is provided.
+    """
+    content = f"<p>{blog_draft}</p>"
+    if source_url and source_url.strip():
+        content += (
+            '<p style="margin-top:24px;">'
+            f'<a href="{source_url.strip()}" target="_blank" rel="noopener noreferrer" '
+            'style="display:inline-block;padding:10px 24px;background-color:#2e6da4;'
+            'color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;'
+            'font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">'
+            '&#128279; View Original Source &rarr;'
+            '</a></p>'
+        )
+    return content
+
+
+# ─────────────────────────────────────────────────────────
+# SECTION 0C: GOOGLE CREDENTIALS
 # ─────────────────────────────────────────────────────────
 
 def get_google_creds():
-    """
-    Load Google OAuth credentials.
-    - Local dev: reads token.pickle file
-    - Deployed (Railway): reads TOKEN_PICKLE_B64 environment variable
-    Automatically refreshes expired tokens.
-    """
     try:
         import pickle
         from google.auth.transport.requests import Request
-
-        creds = None
+        creds     = None
         token_b64 = os.getenv("TOKEN_PICKLE_B64", "")
-
         if token_b64:
             import base64
             creds = pickle.loads(base64.b64decode(token_b64))
         elif os.path.exists("token.pickle"):
             with open("token.pickle", "rb") as f:
                 creds = pickle.load(f)
-
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
             if not token_b64 and os.path.exists("token.pickle"):
                 with open("token.pickle", "wb") as f:
                     pickle.dump(creds, f)
-
         return creds
     except Exception as e:
         print(f"  ⚠️  Could not load credentials: {e}")
@@ -113,7 +126,7 @@ def run_gas_function(service, script_id, function_name, dry_run=False):
             body={"function": function_name, "devMode": True}
         ).execute()
         if "error" in response:
-            error = response["error"]["details"][0] if response["error"].get("details") else response["error"]
+            error     = response["error"]["details"][0] if response["error"].get("details") else response["error"]
             error_msg = error.get("errorMessage", str(error)) if isinstance(error, dict) else str(error)
             print(f"    ❌ Script error: {error_msg}")
             return False
@@ -147,9 +160,7 @@ def run_all_gas_functions(dry_run=False):
         return False
 
     creds = get_google_creds()
-
     if not creds:
-        # First-time browser OAuth (local only)
         try:
             from google_auth_oauthlib.flow import InstalledAppFlow
             import pickle
@@ -164,7 +175,7 @@ def run_all_gas_functions(dry_run=False):
                 print(f"\n  ❌ OAuth client secret not found: '{OAUTH_SECRET}'")
                 return False
             print("\n  🌐 Opening browser for Google login (one-time only)...")
-            flow = InstalledAppFlow.from_client_secrets_file(OAUTH_SECRET, SCOPES)
+            flow  = InstalledAppFlow.from_client_secrets_file(OAUTH_SECRET, SCOPES)
             creds = flow.run_local_server(port=0, open_browser=True)
             with open("token.pickle", "wb") as token:
                 pickle.dump(creds, token)
@@ -195,7 +206,6 @@ def run_all_gas_functions(dry_run=False):
     if not dry_run:
         print("  ⏳ Waiting 5s for spreadsheet to finish writing...")
         time.sleep(5)
-
     return all_ok
 
 
@@ -205,22 +215,18 @@ def run_all_gas_functions(dry_run=False):
 
 def fetch_exports_from_sheets(dry_run=False):
     print("\n  📥 Auto-fetching exports from Google Sheets...")
-
     if not SPREADSHEET_ID:
         print("  ⚠️  SPREADSHEET_ID not set in .env — cannot auto-fetch.")
         return False
-
     try:
         from googleapiclient.discovery import build
     except ImportError:
         print("  ❌ Google API libraries not installed.")
         return False
-
     creds = get_google_creds()
     if not creds:
         print("  ⚠️  No valid credentials — skipping auto-fetch.")
         return False
-
     try:
         sheets_svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
     except Exception as e:
@@ -260,7 +266,7 @@ def fetch_exports_from_sheets(dry_run=False):
         result = sheets_svc.spreadsheets().values().get(
             spreadsheetId=SPREADSHEET_ID, range="Newsletter Draft!A1"
         ).execute()
-        rows = result.get("values", [])
+        rows         = result.get("values", [])
         html_content = rows[0][0] if rows and rows[0] else ""
         if not html_content:
             print("  ⚠️  'Newsletter Draft' tab is empty.")
@@ -341,18 +347,11 @@ def get_or_create_archive_blog(models, uid):
 
 
 def cleanup_expired_odoo_content(models, uid, dry_run=False, auto_confirm=False):
-    """
-    Archive expired blog posts and check newsletter page.
-
-    auto_confirm=True  → no input() prompts (used by pipeline_api.py)
-    auto_confirm=False → interactive CLI prompts
-    Expired posts are MOVED to Archive blog — never deleted.
-    """
     print("\n" + "=" * 60)
     print("  FEATURE 2: Odoo Expiry Cleanup — Archive Mode")
     print("=" * 60)
 
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today   = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     summary = {
         "expired_posts_found":    0,
         "expired_posts_archived": 0,
@@ -360,7 +359,6 @@ def cleanup_expired_odoo_content(models, uid, dry_run=False, auto_confirm=False)
         "errors":                 [],
     }
 
-    # Pass A: Archive expired posts
     print(f"\n  Pass A: Checking for expired blog posts (before {today.strftime('%Y-%m-%d')})...")
     try:
         all_posts = models.execute_kw(
@@ -388,9 +386,8 @@ def cleanup_expired_odoo_content(models, uid, dry_run=False, auto_confirm=False)
                 do_archive = True
                 if not auto_confirm:
                     print(f"\n  ⚠️  These will be MOVED to Archive blog (not deleted).")
-                    choice = input("  Archive them all? [Y/n]: ").strip().lower()
+                    choice     = input("  Archive them all? [Y/n]: ").strip().lower()
                     do_archive = choice in ("y", "yes", "")
-
                 if do_archive:
                     archive_blog_id = get_or_create_archive_blog(models, uid)
                     for post in expired:
@@ -412,7 +409,6 @@ def cleanup_expired_odoo_content(models, uid, dry_run=False, auto_confirm=False)
         summary["errors"].append(f"Error fetching posts: {e}")
         print(f"  ❌ {e}")
 
-    # Pass B: Newsletter check
     print(f"\n  Pass B: Checking newsletter page...")
     try:
         pages = models.execute_kw(
@@ -487,7 +483,12 @@ def get_existing_titles(models, uid):
 
 
 def create_draft(models, uid, blog_id, title, content_html, event_date_str=None):
-    post_data = {"blog_id": blog_id, "name": title, "content": content_html, "website_published": False}
+    post_data = {
+        "blog_id":           blog_id,
+        "name":              title,
+        "content":           content_html,
+        "website_published": False,
+    }
     date_obj = smart_parse_date(event_date_str)
     if date_obj:
         post_data["post_date"] = date_obj.strftime("%Y-%m-%d %H:%M:%S")
@@ -515,7 +516,7 @@ def publish_post(models, uid, post_id):
 def push_from_csv(models, uid, blog_id, no_confirm=False, publish_all=False,
                   do_newsletter=True, dry_run=False, newsletter_cleared=False,
                   auto_confirm=False):
-    import csv
+    import csv, re as _re
     posts = []
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE, "r", encoding="utf-8") as f:
@@ -523,8 +524,23 @@ def push_from_csv(models, uid, blog_id, no_confirm=False, publish_all=False,
                 name    = row.get("name", "").strip()
                 content = row.get("content", "").strip()
                 pd      = row.get("post_date", "").strip()
+                # Extract source URL embedded by Code.gs
+                source_url = ""
+                m = _re.search(r'href="([^"]+)"', content)
+                if m:
+                    source_url = m.group(1)
+                # Extract plain blog text
+                blog_text = content
+                p_match = _re.search(r'<p>(.*?)</p>', content, _re.DOTALL)
+                if p_match:
+                    blog_text = p_match.group(1)
                 if name and content:
-                    posts.append({"name": name, "content": content, "post_date": pd})
+                    posts.append({
+                        "name":       name,
+                        "blog_text":  blog_text,
+                        "post_date":  pd,
+                        "source_url": source_url,
+                    })
         print(f"\n[PUSH] Loaded {len(posts)} posts from {CSV_FILE}")
     else:
         print(f"\n⚠️  '{CSV_FILE}' not found — skipping blog post push.")
@@ -544,12 +560,15 @@ def push_from_csv(models, uid, blog_id, no_confirm=False, publish_all=False,
             created += 1
             continue
 
+        # Build content with styled source button
+        content_html = build_post_content(post["blog_text"], post.get("source_url", ""))
+
         choice = "s" if (auto_confirm or no_confirm) else _ask(no_confirm, publish_all)
         if choice == "d":
             discarded += 1
             continue
 
-        post_id = create_draft(models, uid, blog_id, post["name"], post["content"], post.get("post_date"))
+        post_id = create_draft(models, uid, blog_id, post["name"], content_html, post.get("post_date"))
         if not post_id:
             continue
         existing[title_key] = {"id": post_id}
@@ -582,9 +601,9 @@ def push_from_cache(models, uid, blog_id, no_confirm=False, publish_all=False, d
         if title.strip().lower() in existing:
             skipped += 1
             continue
-        source_url = ev.get("url", "")
-        content_html = (f"<p>{ev.get('blog_draft', '')}</p>"
-                        + (f'<p><a href="{source_url}">Read more →</a></p>' if source_url else ""))
+        source_url   = ev.get("url", "")
+        blog_draft   = ev.get("blog_draft", "")
+        content_html = build_post_content(blog_draft, source_url)
         if dry_run:
             created += 1
             continue
