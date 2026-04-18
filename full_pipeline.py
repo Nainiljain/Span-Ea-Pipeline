@@ -61,16 +61,16 @@ NEWSLETTER_FILE = os.getenv("NEWSLETTER_FILE", "News.html")
 def build_post_content(blog_draft, source_url=""):
     """
     Build full HTML for a blog post.
-    Uses Odoo-native Bootstrap classes so the button survives Odoo's sanitizer.
+    Uses spanea-source-btn CSS class defined in Odoo custom CSS.
     """
     content = f"<p>{blog_draft}</p>"
     if source_url and source_url.strip():
         url = source_url.strip()
         content += (
-            f'<p class="text-center mt-4">'
+            f'<div class="spanea-source-wrap">'
             f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-            f'class="btn btn-primary btn-lg rounded-pill px-4">'
-            f'&#128279; View Original Source &rarr;</a></p>'
+            f'class="spanea-source-btn">'
+            f'&#128279; View Original Source &rarr;</a></div>'
         )
     return content
 
