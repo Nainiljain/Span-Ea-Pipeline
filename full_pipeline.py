@@ -61,25 +61,49 @@ NEWSLETTER_FILE = os.getenv("NEWSLETTER_FILE", "News.html")
 def build_post_content(blog_draft, source_url=""):
     """
     Build full HTML for a blog post.
-    Appends a styled blue 'View Original Source' button when a URL is provided.
+    When a source URL is provided, adds an auto-redirect so clicking the
+    post card on the blog listing page takes users directly to the original
+    source website. Shows a 3-second countdown with a manual button fallback.
     """
-    content = f"<p>{blog_draft}</p>"
     if source_url and source_url.strip():
-        content += (
-            '<p style="margin-top:24px;">'
-            f'<a href="{source_url.strip()}" target="_blank" rel="noopener noreferrer" '
+        url = source_url.strip()
+        redirect_script = (
+            "<script>(function(){"
+            "var s='" + "' + url + '" + "',n=3,"
+            "el=document.getElementById('spanea-count');"
+            "var t=setInterval(function(){"
+            "n--;if(el)el.textContent=n;"
+            "if(n<=0){clearInterval(t);window.location.href=s;}"
+            "},1000);}})();</script>"
+        )
+        banner = (
+            '<div style="background:#f0f7ff;border:1px solid #2e6da4;border-radius:8px;'
+            'padding:16px 20px;margin-bottom:24px;text-align:center;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#1a3a5c;font-weight:600;">'
+            '&#128279; This post links to an external source.</p>'
+            '<p style="margin:0 0 12px;font-size:13px;color:#555;">'
+            'Redirecting in <strong><span id="spanea-count">3</span></strong> second(s)...</p>'
+            f'<a href="{url}" '
             'style="display:inline-block;padding:10px 24px;background-color:#2e6da4;'
             'color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;'
             'font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">'
-            '&#128279; View Original Source &rarr;'
-            '</a></p>'
+            '&#128279; Go to Original Source Now &rarr;</a></div>'
         )
+        content = banner + f"<p>{blog_draft}</p>"
+        # Build redirect script with actual URL
+        content += (
+            "<script>(function(){"
+            f"var s='{url}',n=3,"
+            "el=document.getElementById('spanea-count');"
+            "var t=setInterval(function(){"
+            "n--;if(el)el.textContent=n;"
+            "if(n<=0){clearInterval(t);window.location.href=s;}"
+            "},1000);}})();</script>"
+        )
+    else:
+        content = f"<p>{blog_draft}</p>"
     return content
 
-
-# ─────────────────────────────────────────────────────────
-# SECTION 0C: GOOGLE CREDENTIALS
-# ─────────────────────────────────────────────────────────
 
 def get_google_creds():
     try:
