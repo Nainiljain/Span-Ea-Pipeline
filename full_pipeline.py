@@ -61,45 +61,39 @@ NEWSLETTER_FILE = os.getenv("NEWSLETTER_FILE", "News.html")
 def build_post_content(blog_draft, source_url=""):
     """
     Build full HTML for a blog post.
-    When a source URL is provided, adds an auto-redirect so clicking the
-    post card on the blog listing page takes users directly to the original
-    source website. Shows a 3-second countdown with a manual button fallback.
+    Adds a prominent source banner at the top and bottom so users
+    can easily click through to the original source website.
+    Note: Odoo strips <script> tags from post content, so we use
+    a pure HTML/CSS approach instead of JavaScript redirect.
     """
     if source_url and source_url.strip():
         url = source_url.strip()
-        redirect_script = (
-            "<script>(function(){"
-            "var s='" + "' + url + '" + "',n=3,"
-            "el=document.getElementById('spanea-count');"
-            "var t=setInterval(function(){"
-            "n--;if(el)el.textContent=n;"
-            "if(n<=0){clearInterval(t);window.location.href=s;}"
-            "},1000);}})();</script>"
+        # Top banner — prominent, can't be missed
+        top_banner = (
+            f'<div style="background:linear-gradient(135deg,#1a3a5c,#2e6da4);'
+            f'border-radius:10px;padding:20px 24px;margin-bottom:28px;text-align:center;'
+            f'box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
+            f'<p style="margin:0 0 6px;font-size:13px;color:rgba(255,255,255,0.85);'
+            f'font-weight:500;letter-spacing:0.3px;">CURATED BY SPAN-EA</p>'
+            f'<p style="margin:0 0 16px;font-size:16px;color:#ffffff;font-weight:700;">'
+            f'This content is sourced from an external organization.</p>'
+            f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
+            f'style="display:inline-block;padding:12px 28px;background:#ffffff;'
+            f'color:#1a3a5c;text-decoration:none;border-radius:50px;font-weight:700;'
+            f'font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">'
+            f'&#128279; Visit Original Source &rarr;</a>'
+            f'</div>'
         )
-        banner = (
-            '<div style="background:#f0f7ff;border:1px solid #2e6da4;border-radius:8px;'
-            'padding:16px 20px;margin-bottom:24px;text-align:center;">'
-            '<p style="margin:0 0 8px;font-size:14px;color:#1a3a5c;font-weight:600;">'
-            '&#128279; This post links to an external source.</p>'
-            '<p style="margin:0 0 12px;font-size:13px;color:#555;">'
-            'Redirecting in <strong><span id="spanea-count">3</span></strong> second(s)...</p>'
-            f'<a href="{url}" '
-            'style="display:inline-block;padding:10px 24px;background-color:#2e6da4;'
-            'color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;'
-            'font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">'
-            '&#128279; Go to Original Source Now &rarr;</a></div>'
+        # Bottom button
+        bottom_btn = (
+            f'<p style="margin-top:28px;text-align:center;">'
+            f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
+            f'style="display:inline-block;padding:10px 24px;background-color:#2e6da4;'
+            f'color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;'
+            f'font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">'
+            f'&#128279; View Original Source &rarr;</a></p>'
         )
-        content = banner + f"<p>{blog_draft}</p>"
-        # Build redirect script with actual URL
-        content += (
-            "<script>(function(){"
-            f"var s='{url}',n=3,"
-            "el=document.getElementById('spanea-count');"
-            "var t=setInterval(function(){"
-            "n--;if(el)el.textContent=n;"
-            "if(n<=0){clearInterval(t);window.location.href=s;}"
-            "},1000);}})();</script>"
-        )
+        content = top_banner + f"<p>{blog_draft}</p>" + bottom_btn
     else:
         content = f"<p>{blog_draft}</p>"
     return content
