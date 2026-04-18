@@ -61,41 +61,20 @@ NEWSLETTER_FILE = os.getenv("NEWSLETTER_FILE", "News.html")
 def build_post_content(blog_draft, source_url=""):
     """
     Build full HTML for a blog post.
-    Adds a prominent source banner at the top and bottom so users
-    can easily click through to the original source website.
-    Note: Odoo strips <script> tags from post content, so we use
-    a pure HTML/CSS approach instead of JavaScript redirect.
+    Shows AI-generated blog text with a styled source button at the bottom.
     """
+    content = f"<p>{blog_draft}</p>"
     if source_url and source_url.strip():
         url = source_url.strip()
-        # Top banner — prominent, can't be missed
-        top_banner = (
-            f'<div style="background:linear-gradient(135deg,#1a3a5c,#2e6da4);'
-            f'border-radius:10px;padding:20px 24px;margin-bottom:28px;text-align:center;'
-            f'box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
-            f'<p style="margin:0 0 6px;font-size:13px;color:rgba(255,255,255,0.85);'
-            f'font-weight:500;letter-spacing:0.3px;">CURATED BY SPAN-EA</p>'
-            f'<p style="margin:0 0 16px;font-size:16px;color:#ffffff;font-weight:700;">'
-            f'This content is sourced from an external organization.</p>'
-            f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-            f'style="display:inline-block;padding:12px 28px;background:#ffffff;'
-            f'color:#1a3a5c;text-decoration:none;border-radius:50px;font-weight:700;'
-            f'font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,0.2);">'
-            f'&#128279; Visit Original Source &rarr;</a>'
-            f'</div>'
-        )
-        # Bottom button
-        bottom_btn = (
+        content += (
             f'<p style="margin-top:28px;text-align:center;">'
             f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-            f'style="display:inline-block;padding:10px 24px;background-color:#2e6da4;'
-            f'color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;'
-            f'font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">'
+            f'style="display:inline-block;padding:12px 28px;background-color:#2e6da4;'
+            f'color:#ffffff;text-decoration:none;border-radius:50px;font-weight:700;'
+            f'font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,0.2);'
+            f'letter-spacing:0.3px;">'
             f'&#128279; View Original Source &rarr;</a></p>'
         )
-        content = top_banner + f"<p>{blog_draft}</p>" + bottom_btn
-    else:
-        content = f"<p>{blog_draft}</p>"
     return content
 
 
@@ -232,12 +211,19 @@ def run_all_gas_functions(dry_run=False):
 # ─────────────────────────────────────────────────────────
 
 def fetch_exports_from_sheets(dry_run=False):
+    """
+    Fetch Events.csv directly from Sheet1 (main data sheet).
+    Reads AI Title, Blog Draft, Event Date, and source URL directly.
+    No dependency on Code.gs Events Export tab.
+    Also fetches News.html from Newsletter Draft tab.
+    """
     print("\n  📥 Auto-fetching exports from Google Sheets...")
     if not SPREADSHEET_ID:
         print("  ⚠️  SPREADSHEET_ID not set in .env — cannot auto-fetch.")
         return False
     try:
         from googleapiclient.discovery import build
+        import csv as csv_module
     except ImportError:
         print("  ❌ Google API libraries not installed.")
         return False
@@ -253,33 +239,85 @@ def fetch_exports_from_sheets(dry_run=False):
 
     fetched_any = False
 
-    # Events Export → Events.csv
+    # ── Fetch Sheet1 directly → Events.csv with source_url ───────────────
     try:
         result = sheets_svc.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID, range="Events Export!A:D"
+            spreadsheetId=SPREADSHEET_ID, range="Sheet1!A:M"
         ).execute()
         rows = result.get("values", [])
-        if len(rows) < 2:
-            print("  ⚠️  'Events Export' tab is empty.")
-        else:
-            import csv as csv_module, io
-            output = io.StringIO()
-            writer = csv_module.writer(output, quoting=csv_module.QUOTE_ALL)
-            for row in rows:
-                while len(row) < 4:
-                    row.append("")
-                writer.writerow(row[:4])
-            if not dry_run:
-                with open(CSV_FILE, "w", encoding="utf-8", newline="") as f:
-                    f.write(output.getvalue())
-                print(f"  ✅ Events.csv written  ({len(rows) - 1} posts)")
-            else:
-                print(f"  [DRY-RUN] Would write Events.csv ({len(rows) - 1} posts)")
-            fetched_any = True
-    except Exception as e:
-        print(f"  ❌ Failed to fetch 'Events Export': {e}")
 
-    # Newsletter Draft → News.html
+        if len(rows) < 2:
+            print("  ⚠️  Sheet1 is empty.")
+        else:
+            headers = [h.strip().lower() for h in rows[0]]
+            def col(name):
+                try: return headers.index(name)
+                except ValueError: return -1
+
+            c_url    = col("url")
+            c_status = col("status")
+            c_title  = col("ai title")
+            c_blog   = col("generated blog draft")
+            c_date   = col("event date")
+            c_flag   = col("upcoming flag")
+            c_qa     = col("qa notes")
+
+            exported = []
+            skipped_past = skipped_dead = 0
+
+            for row in rows[1:]:
+                def get(c):
+                    return row[c].strip() if c >= 0 and c < len(row) else ""
+
+                if get(c_status) != "Processed":
+                    continue
+                if "past event" in get(c_flag).lower():
+                    skipped_past += 1
+                    continue
+                if get(c_qa) == "❌ Dead link":
+                    skipped_dead += 1
+                    continue
+
+                title      = get(c_title)
+                blog       = get(c_blog)
+                source_url = get(c_url)
+                raw_date   = get(c_date)
+
+                if not title or not blog:
+                    continue
+
+                date_str = ""
+                d = smart_parse_date(raw_date)
+                if d:
+                    date_str = d.strftime("%Y-%m-%d %H:%M:%S")
+
+                exported.append({
+                    "name":              title,
+                    "content":           blog,
+                    "website_published": "False",
+                    "post_date":         date_str,
+                    "source_url":        source_url,
+                })
+
+            if not exported:
+                print("  ⚠️  No exportable rows found in Sheet1.")
+            elif not dry_run:
+                with open(CSV_FILE, "w", encoding="utf-8", newline="") as f:
+                    writer = csv_module.DictWriter(f,
+                        fieldnames=["name","content","website_published","post_date","source_url"],
+                        quoting=csv_module.QUOTE_ALL)
+                    writer.writeheader()
+                    writer.writerows(exported)
+                print(f"  ✅ Events.csv written  ({len(exported)} posts, {skipped_past} past skipped)")
+                fetched_any = True
+            else:
+                print(f"  [DRY-RUN] Would write Events.csv ({len(exported)} posts)")
+                fetched_any = True
+
+    except Exception as e:
+        print(f"  ❌ Failed to fetch Sheet1: {e}")
+
+    # ── Newsletter Draft → News.html ──────────────────────────────────────
     try:
         result = sheets_svc.spreadsheets().values().get(
             spreadsheetId=SPREADSHEET_ID, range="Newsletter Draft!A1"
@@ -287,7 +325,7 @@ def fetch_exports_from_sheets(dry_run=False):
         rows         = result.get("values", [])
         html_content = rows[0][0] if rows and rows[0] else ""
         if not html_content:
-            print("  ⚠️  'Newsletter Draft' tab is empty.")
+            print("  ⚠️  Newsletter Draft tab is empty.")
         else:
             if not dry_run:
                 with open(NEWSLETTER_FILE, "w", encoding="utf-8") as f:
@@ -297,14 +335,9 @@ def fetch_exports_from_sheets(dry_run=False):
                 print(f"  [DRY-RUN] Would write News.html ({len(html_content):,} chars)")
             fetched_any = True
     except Exception as e:
-        print(f"  ❌ Failed to fetch 'Newsletter Draft': {e}")
+        print(f"  ❌ Failed to fetch Newsletter Draft: {e}")
 
     return fetched_any
-
-
-# ─────────────────────────────────────────────────────────
-# SECTION 2: ODOO HELPERS
-# ─────────────────────────────────────────────────────────
 
 def odoo_connect():
     if not ODOO_URL or not ODOO_USER or not ODOO_PASSWORD:
@@ -534,24 +567,22 @@ def publish_post(models, uid, post_id):
 def push_from_csv(models, uid, blog_id, no_confirm=False, publish_all=False,
                   do_newsletter=True, dry_run=False, newsletter_cleared=False,
                   auto_confirm=False):
-    import csv, re as _re
+    import csv
     posts = []
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE, "r", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                name    = row.get("name", "").strip()
-                content = row.get("content", "").strip()
-                pd      = row.get("post_date", "").strip()
-                # Extract source URL embedded by Code.gs
-                source_url = ""
-                m = _re.search(r'href="([^"]+)"', content)
-                if m:
-                    source_url = m.group(1)
-                # Extract plain blog text
-                blog_text = content
-                p_match = _re.search(r'<p>(.*?)</p>', content, _re.DOTALL)
-                if p_match:
-                    blog_text = p_match.group(1)
+                name       = row.get("name", "").strip()
+                content    = row.get("content", "").strip()
+                pd         = row.get("post_date", "").strip()
+                # source_url is now its own column (column E) added by Code.gs
+                source_url = row.get("source_url", "").strip()
+                # content column is plain blog text (no HTML wrapping from sheet)
+                blog_text  = content
+                # Skip rows with raw RSS content (not AI-processed)
+                if "appeared first on" in blog_text.lower():
+                    print(f"  ⏭️  Skipping raw RSS content: {name[:50]}")
+                    continue
                 if name and content:
                     posts.append({
                         "name":       name,
