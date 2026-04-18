@@ -1,14 +1,11 @@
-/**
-
 // ── Headless API execution helper ─────────────────────────────────────────
 // When called via Apps Script Execution API, UI functions crash.
-// Use safeAlert() and safeShowDialog() instead of safeAlert()/showModalDialog()
 function isHeadless() {
   try { SpreadsheetApp.getUi(); return false; } catch(e) { return true; }
 }
 function safeAlert(msg) {
   if (isHeadless()) { Logger.log('[HEADLESS] ' + msg); return; }
-  safeAlert(msg);
+  SpreadsheetApp.getUi().alert(msg);
 }
 function safeShowDialog(html, title) {
   if (isHeadless()) { Logger.log('[HEADLESS] Dialog skipped: ' + title); return; }
@@ -16,21 +13,11 @@ function safeShowDialog(html, title) {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
- * Project: SPAN-EA AI Content Engine (Version 3.2 - Dead Link Shield)
- *
- * FIXES IN THIS VERSION:
- * - Fixed AI model name (was "gemini-3.1-flash-lite-preview" which doesn't exist)
- * - Added URL validation: every link is HTTP-checked before being used
- * - Dead links auto-fixed via Gemini; unfixable ones flagged in QA Notes
- * - Newsletter and CSV export skip rows with confirmed dead links
- * - Odoo push skips dead-link rows to prevent broken "Source" links
- * - exportCSVForOdoo also skips dead-link rows
- *
- * COLUMN LAYOUT (Traditional A-M):
- * A: Date Scraped | B: Source | C: Original Title | D: Original Content | E: URL
- * F: Status       | G: QA Notes
- * H: AI Category  | I: Event Date | J: AI Title | K: CPD Info | L: Generated Blog Draft | M: Upcoming Flag
- */
+// Project: SPAN-EA AI Content Engine (Version 3.3 - Source Link Fix)
+// FIXES: Fixed opening comment bug, safeAlert recursion, source_url in CSV export
+// COLUMN LAYOUT: A:Date Scraped | B:Source | C:Original Title | D:Original Content | E:URL
+//                F:Status | G:QA Notes | H:AI Category | I:Event Date | J:AI Title
+//                K:CPD Info | L:Generated Blog Draft | M:Upcoming Flag
 
 const SCRIPT_PROP_KEY = 'GEMINI_API_KEY';
 
@@ -583,9 +570,11 @@ function exportCSVForOdoo() {
   exportSheet.getRange(1, 2).setValue("content");
   exportSheet.getRange(1, 3).setValue("website_published");
   exportSheet.getRange(1, 4).setValue("post_date");
+  exportSheet.getRange(1, 5).setValue("source_url");
   exportableRows.forEach((row, idx) => {
-    const title = (row[col.title] || "").toString();
-    const blog  = (row[col.blog]  || "").toString();
+    const title     = (row[col.title] || "").toString();
+    const blog      = (row[col.blog]  || "").toString();
+    const sourceUrl = col.url >= 0 ? (row[col.url] || "").toString().trim() : "";
     let dateStr = "";
     const pDate = smartParseDate(row[col.date]);
     if (pDate) dateStr = Utilities.formatDate(pDate, "GMT", "yyyy-MM-dd HH:mm:ss");
@@ -594,6 +583,7 @@ function exportCSVForOdoo() {
     exportSheet.getRange(idx + 2, 2).setValue(blog);
     exportSheet.getRange(idx + 2, 3).setValue("False");
     exportSheet.getRange(idx + 2, 4).setValue(dateStr);
+    exportSheet.getRange(idx + 2, 5).setValue(sourceUrl);
   });
 
   const skippedMsg = [
