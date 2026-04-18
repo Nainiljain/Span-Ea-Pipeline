@@ -1,0 +1,1 @@
+web: gunicorn pipeline_api:app --workers 2 --timeout 600 --bind 0.0.0.0:$PORT
