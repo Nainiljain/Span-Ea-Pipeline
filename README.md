@@ -17,8 +17,7 @@ Python Scraper → Google Sheets + Gemini AI → Odoo CMS (JSON-RPC)
 1. **Setup Python:**
    ```bash
    pip install -r requirements.txt
-   cp .env.example .env
-   # Edit .env → add your Webhook URL + Odoo credentials
+   # Create .env in this folder, then add your Webhook URL + Odoo credentials
    ```
 
 2. **Run Scraper:**
@@ -43,7 +42,7 @@ Python Scraper → Google Sheets + Gemini AI → Odoo CMS (JSON-RPC)
    python push_to_odoo.py
    ```
 
-See [DEMO_GUIDE.md](DEMO_GUIDE.md) for the complete step-by-step demo flow.
+See [demo_guide.md](demo_guide.md) for the complete step-by-step demo flow.
 See [setup_guide.md](setup_guide.md) for initial setup from scratch.
 
 ## Project Files
@@ -55,8 +54,8 @@ See [setup_guide.md](setup_guide.md) for initial setup from scratch.
 | `push_to_odoo.py` | Fallback: XML-RPC automation. Supports Cache mode (JSON) and CSV mode with interactive per-post review |
 | `auto_pipeline.py` | **[Advanced]** Fully automated end-to-end pipeline — scrape, AI enrich, and push to Odoo in one command (bypasses Google Sheets) |
 | `requirements.txt` | Python dependencies |
-| `.env.example` | Environment variable template |
-| `DEMO_GUIDE.md` | Complete demo flow (step-by-step) |
+| `.env` | Environment variables for local run and fallback push |
+| `demo_guide.md` | Complete demo flow (step-by-step) |
 | `setup_guide.md` | Initial setup & installation guide |
 | `TECH_SPECS.md` | Technical specifications, architecture, and safeguards |
 

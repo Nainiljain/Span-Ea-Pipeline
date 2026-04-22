@@ -31,7 +31,7 @@ No need for Email Marketing or Events — we don't use them.
 
 ### Python Side
 1. Clone the project: `git clone <repo-url>`
-2. Rename `.env.example` → `.env`
+2. Create a new `.env` file in the project root
 3. Add your Google Script Webhook URL to `.env`:
    ```
    SPAN_EA_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_ID/exec
@@ -46,16 +46,33 @@ No need for Email Marketing or Events — we don't use them.
 5. Install dependencies: `pip install -r requirements.txt`
 
 ### Google Sheet Side
-1. Create a new Google Sheet with columns A–M:
+1. **Recommended:** Prepare one master Google Sheet Prototype (template) with all required tabs/headers, then share a **Make a copy** link to users.
+   - **Current Prototype (Make a copy):** https://docs.google.com/spreadsheets/d/1AEuzDdNTFhaYT5l37ESgq8EUS5DP9T1WPGL1ojjQNik/copy
+2. In the Prototype, set columns A-M on `Sheet1` exactly as:
    `Date Scraped | Source | Original Title | Original Content | URL | Status | QA Notes | AI Category | Event Date | AI Title | CPD Info | Generated Blog Draft | Upcoming Flag`
-2. Create a **"Config"** tab with a Named Range `GenEveryDays` = `14`
-3. Open **Extensions > Apps Script** → paste the entire `Code.gs`
-4. Run the following setup steps from the **SPAN-EA AI** menu:
+3. In the Prototype, create a `Config` tab and add Named Range `GenEveryDays` = `14`
+4. Open **Extensions > Apps Script** in the Prototype sheet and paste the entire `Code.gs`
+5. Run the following setup steps from the **SPAN-EA AI** menu:
    - **Setup > Set Gemini API Key** → paste your key from Google AI Studio
    - **Setup > Set Odoo Credentials** → enter your Odoo URL, database name, username, and password
    - **Setup > Apply Date Picker** → enable calendar date selection on Column I
    - **Setup > Apply QA Dropdown** → enable the QA validation dropdown on Column G
-5. Deploy the script as a Web App (Execute as: Me, Access: Anyone) → copy the Webhook URL to `.env`
+6. Deploy the script as a Web App (Execute as: Me, Access: Anyone) → copy the Webhook URL to `.env`
+
+### After User Clicks "Make a copy" (Important)
+1. Rename the spreadsheet file (recommended):
+   - Example: `SPAN-EA Pipeline - Team A` or `SPAN-EA Pipeline - ClientName`
+2. **Do not rename these tabs** unless you also update `Code.gs`:
+   - `Sheet1`
+   - `Config`
+3. Keep the A-M headers exactly the same on `Sheet1`.
+4. In the copied sheet, run setup again from **SPAN-EA AI** menu:
+   - Setup: Set Gemini API Key
+   - Setup: Set Odoo Credentials
+   - Setup: Apply Date Picker to Column I
+   - Setup: Apply QA Dropdown to Column G
+5. Re-deploy the Apps Script Web App from the copied sheet and use its webhook URL in `.env`:
+   - `SPAN_EA_WEBHOOK_URL=...`
 
 ---
 
