@@ -147,6 +147,7 @@ Data flows into Google Sheet automatically via webhook.
 
 ### Step 2: QA (Human Review)
 - New rows appear as **"Pending"** in Column F.
+- **💡 Tip: Find Pending rows fast** — Click the filter icon (▼) on the **Status** column header → **Filter by value** → select `Pending` only. This hides all already-processed rows so you see only what needs review. Alternatively, use **Filter by color** if the sheet has conditional formatting.
 - Use the QA Dropdown in Column G to approve or reject each row.
 - If a link is bad → select **"❌ Dead link"** → status flips to **"Rejected"** automatically.
 
@@ -230,6 +231,34 @@ If you need to re-push events (e.g., after deleting test posts from Odoo):
 
 Open your Odoo site and check:
 - [ ] `/blog` — AI-generated posts are listed, sorted with soonest events at the top
-- [ ] `/newsletter` — Newsletter HTML renders correctly with event cards
+- [ ] `/newsletter-1` — Newsletter HTML renders correctly with event cards
 - [ ] Blog posts are in **Draft mode** until you manually publish them
 - [ ] Navigation menu shows: Home | Blog | Newsletter
+
+---
+
+## 🤖 Changing the AI Model
+
+By default the pipeline uses `gemini-2.0-flash` (free tier). If you hit rate limits or want better quality, change the model name in **2 files only**:
+
+### File 1: `Code.gs` (line ~28)
+```javascript
+const AI_MODEL_NAME = "gemini-2.0-flash";  // ← change this
+```
+
+### File 2: `auto_pipeline.py` (line ~53)
+```python
+AI_MODEL = "gemini-2.0-flash"  # ← change this
+```
+
+### Available Model Options
+
+| Model Name | Cost | Notes |
+|---|---|---|
+| `gemini-2.0-flash-lite` | Free | Lowest limit, for testing |
+| `gemini-2.0-flash` | Free | **Default** |
+| `gemini-3.1-flash-lite-preview` | Free | Higher throughput, fewer rate limit errors |
+| `gemini-2.5-flash` | Free (new tier) | Improved quality |
+| `gemini-2.5-pro` | 💰 Paid | Best quality, for production use |
+
+> **Note:** To use a non-Gemini AI provider (e.g., OpenAI, Claude), the API call logic inside both `Code.gs` and `auto_pipeline.py` must also be updated — not just the model name.
