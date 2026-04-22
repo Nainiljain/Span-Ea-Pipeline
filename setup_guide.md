@@ -30,20 +30,81 @@ No need for Email Marketing or Events — we don't use them.
 ## Phase 2: Set Up Google Sheet + Python Scraper
 
 ### Python Side
-1. Clone the project: `git clone <repo-url>`
-2. Create a new `.env` file in the project root
-3. Add your Google Script Webhook URL to `.env`:
+1. Install **Python 3.10 or higher** (if not already installed):
+   - Download from 👉 https://python.org/downloads
+   - During installation, check **"Add Python to PATH"**
+   - Verify it works by running: `python --version` (should show 3.10+)
+
+2. Clone the project:
+   ```bash
+   git clone https://github.com/Nainiljain/Span-Ea-Pipeline.git
+   cd Span-Ea-Pipeline
    ```
-   SPAN_EA_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_ID/exec
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
    ```
-4. Add your Odoo credentials to `.env` (used by the Python fallback script):
+3. Create a `.env` file in the project root with the following values:
    ```
    ODOO_URL=https://your-site.odoo.com
    ODOO_DB=your-database-name
    ODOO_USER=your-email@example.com
-   ODOO_PASSWORD=your-password
+   ODOO_PASSWORD=your-odoo-password
+   GAS_SCRIPT_ID=your-apps-script-id
+   SPREADSHEET_ID=your-google-sheet-id
+   OAUTH_CLIENT_SECRET_JSON=client_secret.json
    ```
-5. Install dependencies: `pip install -r requirements.txt`
+
+---
+
+### 🔑 Where to Get Each Credential
+
+#### ODOO_URL / ODOO_DB / ODOO_USER / ODOO_PASSWORD
+These come from your existing Odoo account (provided by the sponsor/admin):
+- `ODOO_URL` — the URL you use to log in to Odoo, e.g. `https://spanea.odoo.com`
+- `ODOO_DB` — the database name, usually the part before `.odoo.com`, e.g. `spanea`
+- `ODOO_USER` — your Odoo login email
+- `ODOO_PASSWORD` — your Odoo login password
+
+#### SPREADSHEET_ID — from Google Sheets URL
+1. Click the link below to copy the template sheet:
+   👉 https://docs.google.com/spreadsheets/d/1AEuzDdNTFhaYT5l37ESgq8EUS5DP9T1WPGL1ojjQNik/copy
+2. After copying, look at the URL of your new sheet:
+   ```
+   https://docs.google.com/spreadsheets/d/[ THIS PART IS YOUR SPREADSHEET_ID ]/edit
+   ```
+3. Copy that ID into your `.env` file.
+
+#### GAS_SCRIPT_ID — from Google Apps Script
+1. In your copied Google Sheet, click **Extensions > Apps Script**
+2. Delete any existing code, then paste the entire contents of `Code.gs` from this repo
+3. Click **Save** (💾) and name the project `SPAN-EA Pipeline`
+4. Click the **⚙️ Project Settings** icon (left sidebar)
+5. Scroll down to find **Script ID** — copy it into your `.env` as `GAS_SCRIPT_ID`
+
+#### OAUTH_CLIENT_SECRET_JSON — from Google Cloud Console (one-time setup)
+This file allows Python to call the Apps Script API on your behalf.
+1. Go to 👉 https://console.cloud.google.com
+2. Create a new project (e.g. `SPAN-EA Pipeline`)
+3. Go to **APIs & Services > Library** and enable:
+   - **Google Apps Script API**
+   - **Google Sheets API**
+4. Go to **APIs & Services > Credentials**
+5. Click **+ CREATE CREDENTIALS > OAuth client ID**
+   - Application type: **Desktop app**
+   - Name: `SPAN-EA Desktop Client`
+6. Click **Create**, then **Download JSON**
+7. Rename the downloaded file to `client_secret.json` and place it in the project folder
+
+> ⚠️ Never commit `client_secret.json` to Git — it is already listed in `.gitignore`
+
+#### Gemini API Key — stored in Google Sheets (not in .env)
+The Gemini key is stored securely inside Google Sheets Script Properties, not in `.env`.
+1. Go to 👉 https://aistudio.google.com/apikey
+2. Click **Create API key** and copy it
+3. In your Google Sheet, click **SPAN-EA AI > Setup > Set Gemini API Key** and paste the key
+
+---
 
 ### Google Sheet Side
 1. **Recommended:** Prepare one master Google Sheet Prototype (template) with all required tabs/headers, then share a **Make a copy** link to users.
@@ -169,6 +230,6 @@ If you need to re-push events (e.g., after deleting test posts from Odoo):
 
 Open your Odoo site and check:
 - [ ] `/blog` — AI-generated posts are listed, sorted with soonest events at the top
-- [ ] `/newsletter-1` — Newsletter HTML renders correctly with event cards
+- [ ] `/newsletter` — Newsletter HTML renders correctly with event cards
 - [ ] Blog posts are in **Draft mode** until you manually publish them
 - [ ] Navigation menu shows: Home | Blog | Newsletter
