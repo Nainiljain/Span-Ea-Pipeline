@@ -26,6 +26,9 @@ Python Scraper → Google Sheets + Gemini AI → Odoo CMS (JSON-RPC)
    ```
 
 3. **Google Sheets (Code.gs):**
+   - **Fastest option:** copy the prototype sheet instead of creating one from scratch:
+     `https://docs.google.com/spreadsheets/d/1AEuzDdNTFhaYT5l37ESgq8EUS5DP9T1WPGL1ojjQNik/copy`
+   - In your copied sheet, keep tab names as `Sheet1` and `Config`
    - Open **Extensions > Apps Script** → paste `Code.gs`
    - **SPAN-EA AI > Setup > Set Gemini API Key** → paste your key
    - **SPAN-EA AI > Setup > Set Odoo Credentials** → enter Odoo URL, DB, User, Password
