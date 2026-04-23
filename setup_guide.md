@@ -52,7 +52,7 @@ No need for Email Marketing or Events — we don't use them.
    ODOO_PASSWORD=your-odoo-password
    GAS_SCRIPT_ID=your-apps-script-id
    SPREADSHEET_ID=your-google-sheet-id
-   OAUTH_CLIENT_SECRET_JSON=client_secret.json
+   SPAN_EA_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_ID/exec
    ```
 
 ---
@@ -78,25 +78,39 @@ These come from your existing Odoo account (provided by the sponsor/admin):
 #### GAS_SCRIPT_ID — from Google Apps Script
 1. In your copied Google Sheet, click **Extensions > Apps Script**
 2. Delete any existing code, then paste the entire contents of `Code.gs` from this repo
-3. Click **Save** (💾) and name the project `SPAN-EA Pipeline`
+3. Press **`Ctrl+S`** and name the project `SPAN-EA Pipeline`
 4. Click the **⚙️ Project Settings** icon (left sidebar)
 5. Scroll down to find **Script ID** — copy it into your `.env` as `GAS_SCRIPT_ID`
 
-#### OAUTH_CLIENT_SECRET_JSON — from Google Cloud Console (one-time setup)
-This file allows Python to call the Apps Script API on your behalf.
-1. Go to 👉 https://console.cloud.google.com
-2. Create a new project (e.g. `SPAN-EA Pipeline`)
-3. Go to **APIs & Services > Library** and enable:
+#### SPAN_EA_WEBHOOK_URL — Deploy as Web App (required for scraper)
+> ⚠️ Without this, `scrape_events.py` will only save to local cache and **nothing will appear in Google Sheets**
+
+1. In Apps Script, click **Deploy > New Deployment**
+2. Click the ⚙️ gear icon → select **Web App**
+3. Set **Execute as:** `Me`
+4. Set **Who has access:** `Anyone`
+5. Click **Deploy** → copy the URL (format: `https://script.google.com/macros/s/.../exec`)
+6. Add to your `.env`:
+   ```
+   SPAN_EA_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_ID/exec
+   ```
+
+#### OAUTH_CLIENT_SECRET_JSON — (Optional) for running `full_pipeline.py`
+> ℹ️ **Only needed if** you want Python to control Google Sheets entirely without opening a browser (headless/automated mode via `full_pipeline.py`). Not required for the standard Google Sheets menu workflow.
+
+1. Go to 👉 https://console.cloud.google.com → Create a new project
+2. Go to **APIs & Services > Library** → Enable:
    - **Google Apps Script API**
    - **Google Sheets API**
+3. Go to **APIs & Services > OAuth consent screen**
+   - User Type: **External** → click Create
+   - Fill in App name (e.g. `SPAN-EA Pipeline`) and support email → click Next through all steps
 4. Go to **APIs & Services > Credentials**
-5. Click **+ CREATE CREDENTIALS > OAuth client ID**
-   - Application type: **Desktop app**
-   - Name: `SPAN-EA Desktop Client`
-6. Click **Create**, then **Download JSON**
-7. Rename the downloaded file to `client_secret.json` and place it in the project folder
+   - Click **+ CREATE CREDENTIALS > OAuth client ID**
+   - Application type: **Desktop app** → click Create
+5. Click **Download JSON** → rename to `client_secret.json` → place in project folder
 
-> ⚠️ Never commit `client_secret.json` to Git — it is already listed in `.gitignore`
+> ⚠️ Never commit `client_secret.json` to Git — it is already in `.gitignore`
 
 #### Gemini API Key — stored in Google Sheets (not in .env)
 The Gemini key is stored securely inside Google Sheets Script Properties, not in `.env`.
