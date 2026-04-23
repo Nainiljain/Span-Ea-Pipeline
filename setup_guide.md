@@ -276,3 +276,46 @@ AI_MODEL = "gemini-2.0-flash"  # ← change this
 | `gemini-2.5-pro` | 💰 Paid | Best quality, for production use |
 
 > **Note:** To use a non-Gemini AI provider (e.g., OpenAI, Claude), the API call logic inside both `Code.gs` and `auto_pipeline.py` must also be updated — not just the model name.
+
+---
+
+## 🛠️ Troubleshooting
+
+### ❌ Problem: Rows with "✅ Approved" in QA Notes show "Rejected" in Status
+
+**Why it happens:** Old versions of `Code.gs` used a formula in the Status column that treated *any* non-blank QA value (including Approved) as Rejected.
+
+**Fix (already built-in to Code.gs v3.3+):** The `onEdit` function now watches the QA Notes column. The moment you select a value from the dropdown, Status updates automatically:
+
+| QA Notes selected | Status becomes |
+|---|---|
+| ✅ Approved | **Pending** (AI will process it) |
+| ❌ Not an event / ❌ Past event / ❌ Dead link | **Rejected** |
+| Cleared (empty) | **Pending** |
+| Already "Processed" or "Pushed to Odoo" | *(not changed)* |
+
+> ✅ No manual step needed — just select from the dropdown and Status updates instantly.
+
+If you are upgrading from an older `Code.gs`, paste the latest version into Apps Script and press **Ctrl+S**. Existing rows with the wrong Status can be fixed by re-selecting their QA Notes value from the dropdown.
+
+
+---
+
+### ❌ Problem: Scraper runs but nothing appears in Google Sheets
+
+**Why it happens:** `SPAN_EA_WEBHOOK_URL` is missing or incorrect in your `.env` file. The scraper defaults to local cache mode.
+
+**Fix:**
+1. Deploy Apps Script as a Web App (see [GAS Setup](#gas_script_id--from-google-apps-script) above)
+2. Copy the deployment URL
+3. Add to `.env`: `SPAN_EA_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_ID/exec`
+4. Re-run: `python scrape_events.py --webhook`
+
+---
+
+### ❌ Problem: Step 2 (AI Processing) stops early or shows "Execution time limit"
+
+**Why it happens:** Google Apps Script has a 6-minute execution limit. Large batches hit this limit.
+
+**Fix:** Simply run **Step 2** again — it skips already-processed rows and continues from where it left off.
+

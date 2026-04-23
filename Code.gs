@@ -117,7 +117,8 @@ function doPost(e) {
       const qaColIdx = headers.indexOf("qa notes");
       if (qaColIdx !== -1) {
         const qaLetter = columnToLetter(qaColIdx + 1);
-        setCol("Status", `=IF(ISBLANK(${qaLetter}${newRowIdx}), "Pending", "Rejected")`);
+        // ✅ FIX: Check content — Approved → stay Pending (AI will process), anything else → Rejected
+        setCol("Status", `=IF(ISBLANK(${qaLetter}${newRowIdx}), "Pending", IF(ISNUMBER(SEARCH("Approved",${qaLetter}${newRowIdx})), "Pending", "Rejected"))`);
       } else {
         setCol("Status", "Pending");
       }
