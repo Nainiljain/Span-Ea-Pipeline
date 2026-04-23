@@ -175,7 +175,14 @@ Data flows into Google Sheet automatically via webhook.
 
 ### Step 5: Generate Newsletter (Optional)
 - Go to **SPAN-EA AI > Step 4: Generate Newsletter (News.html)**
-- HTML is saved to a "Newsletter Draft" tab in the sheet.
+- **When to use:** Do this **only** if you want to push an updated Newsletter page to Odoo. HTML is saved to the "Newsletter Draft" tab. If you just want to push Blog posts, you can skip this step.
+
+### Step 6: Export Events CSV (Optional)
+- Go to **SPAN-EA AI > Step 5: Export Events (Events.csv)**
+- **When to use:** Do this **only** if you are going to use the Python Fallback script (`push_to_odoo.py`). If you plan to use "Step 6: Push Directly to Odoo", you can skip this completely.
+
+### Step 7: Push to Odoo
+- Finally, after completing the steps above, use the Direct Push method (Phase 4) to send everything to Odoo!
 
 ---
 
