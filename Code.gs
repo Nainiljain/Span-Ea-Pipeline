@@ -616,6 +616,80 @@ function exportCSVForOdoo() {
 /**
  * Calls Gemini to categorise, title, date, and draft a blog post for one item.
  */
+/**
+ * Pre-extract likely dates from content using regex patterns (no API calls).
+ * Looks for common date formats to help Gemini.
+ */
+function preExtractDates(content, title) {
+  const text = (title + " " + content).toString().trim();
+  
+  // SPECIAL CASE: Doors Open TO 2026 - look for ANY explicit date in content first
+  if ((title + content).toLowerCase().includes("doors open")) {
+    if ((title + content).toLowerCase().includes("2026")) {
+      // Priority: Look for explicit date range in ANY month: "May 23-24", "June 15-17", etc.
+      let explicitRange = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s*[-–—]\s*(\d{1,2}),?\s*(?:20\d{2})?/i);
+      
+      if (explicitRange) {
+        // Found an explicit date range - use it
+        let foundDate = explicitRange[0];
+        // If it doesn't have a year, append 2026
+        if (!foundDate.match(/20\d{2}/)) {
+          foundDate += ", 2026";
+        }
+        Logger.log("📌 Doors Open event with explicit date: " + foundDate);
+        return foundDate;
+      } else {
+        // No explicit date found → use standard Doors Open TO 2026 dates (May 23-24)
+        Logger.log("📌 Doors Open event detected (no explicit date) → using standard May 23-24, 2026");
+        return "May 23-24, 2026";
+      }
+    }
+  }
+  
+  // Priority 1: Look for explicit "[Exact Date Found..." markers
+  let dateMatch = text.match(/\[Exact Date Found[^:]*:\s*([^\]]+)\]/i);
+  if (dateMatch) {
+    const foundDate = dateMatch[1].trim();
+    Logger.log("✓ Found explicit date marker: " + foundDate);
+    return foundDate;
+  }
+  
+  // Priority 2: Look for date ranges with explicit year: "May 23-24, 2026" or "May 23 - 24, 2026"
+  // Works with ANY month (January through December)
+  dateMatch = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s*[-–—]\s*(\d{1,2}),?\s+(20\d{2})/i);
+  if (dateMatch) {
+    const fullDate = dateMatch[0];
+    Logger.log("✓ Extracted date range: " + fullDate);
+    return fullDate;
+  }
+  
+  // Priority 3: Look for: "May 15, 2026" format (with year) - ANY month
+  dateMatch = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(20\d{2})/i);
+  if (dateMatch) {
+    const fullDate = dateMatch[0];
+    Logger.log("✓ Extracted full date: " + fullDate);
+    return fullDate;
+  }
+  
+  // Priority 4: Look for ISO format: "2026-05-15"
+  const isoMatch = text.match(/20\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12][0-9]|3[01])/);
+  if (isoMatch) {
+    Logger.log("✓ Extracted ISO date: " + isoMatch[0]);
+    return isoMatch[0];
+  }
+  
+  // Priority 5: Just month and day without year: "May 15", "June 3", etc (ANY month)
+  dateMatch = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})/i);
+  if (dateMatch) {
+    const monthDay = dateMatch[0];
+    Logger.log("⚠️ Extracted partial date (no year): " + monthDay);
+    return monthDay + ", " + new Date().getFullYear();
+  }
+  
+  Logger.log("❌ No dates found in content");
+  return null;
+}
+
 function callGeminiAPI(title, content, source, manualDate) {
   const apiKey = PropertiesService.getScriptProperties().getProperty(SCRIPT_PROP_KEY);
   if (!apiKey) return { result: null, error: "Missing API Key (Go to Setup > Set API Key)" };
@@ -639,6 +713,12 @@ function callGeminiAPI(title, content, source, manualDate) {
     ? `\nEvent Date provided by QA: ${readableDate}. CRITICAL INSTRUCTION: You MUST return exactly "${readableDate}" for eventDate, and weave this date into the blogDraft naturally.`
     : "";
 
+  // Pre-extract dates from content to help Gemini
+  const extractedDateHint = preExtractDates(content, title);
+  const dateHintText = extractedDateHint
+    ? `\n\nPossible event dates found in content: ${extractedDateHint}. Verify this is the EVENT date (not publication date) and use it if valid.`
+    : "";
+
   const prompt = `Role: You are SPAN-EA's blog editor. SPAN-EA is a professional community that curates and recommends industry events and news for newcomer engineers and architects settling in Ontario, Canada.
 IMPORTANT: SPAN-EA does NOT organize these events. It discovers them from TSA, OAA, PEO, and OSPE and recommends them to its members.
 
@@ -650,11 +730,16 @@ Voice & Style:
 
 Context: Today is ${new Date().toDateString()}. Current year is ${currentYear}. Assume year ${currentYear} for any date without a specified year.
 Source: ${source || "Unknown"}
-Relevant credential: ${pdHoursName}${dateInstruction}
+Relevant credential: ${pdHoursName}${dateInstruction}${dateHintText}
 
 Task: Analyze the article below. Return a JSON object with exactly these fields:
 1. "category": "Upcoming Event" OR "Industry News"
-2. "eventDate": A date string like "March 15, 2026". CRITICAL: DO NOT confuse "(News Published: YYYY-MM-DD)" with the event date. Only extract the true event date from the content. If none found, return "Date TBD".
+2. "eventDate": CRITICAL - Extract the EVENT date (when the event/announcement is happening), NOT the publication date.
+   - Look for: "Date: May 15", "May 15-17, 2026", "scheduled for June 10", "When: July 8", "Doors Open ... [date]", explicit date mentions.
+   - IGNORE: Publication dates like "posted on 2024-04-22" or "Published: April 2024".
+   - If ONLY a month/year found (e.g., "May 2026"), return "May 2026".
+   - If completely absent, return "Date TBD".
+   - Return format: "MMMM d, yyyy" (e.g., "May 15, 2026") or "MMMM yyyy" if only month known.
 3. "aiTitle": A catchy, professional blog title (max 10 words). Use curiosity-gap or benefit-driven phrasing. Do NOT copy the original title.
 4. "cpdInfo": CRITICAL: ONLY extract professional credits (e.g., ${pdHoursName}) if the source explicitly mentions them. If not found, return exactly "Not specified". NEVER guess or assume.
 5. "blogDraft": A publish-ready blog post (4-5 sentences) in SPAN-EA's editorial voice:
@@ -693,6 +778,34 @@ Respond ONLY with valid JSON. No markdown, no explanation, no extra text.`;
     if (match) {
       const result = JSON.parse(match[0]);
       if (result.category && result.eventDate && result.blogDraft) {
+        
+        // VALIDATION: Verify Gemini's date extraction quality
+        const preExtracted = preExtractDates(content, title);
+        const geminiDate = result.eventDate.trim();
+        
+        // Rule 1: If Gemini returned "Date TBD" but we found a date, use the found date
+        if (geminiDate === "Date TBD" && preExtracted) {
+          Logger.log("✅ Gemini said TBD, but found date: " + preExtracted);
+          result.eventDate = preExtracted;
+        }
+        
+        // Rule 2: If Gemini returned January 1 (likely default fallback), replace with pre-extracted
+        if (geminiDate !== "Date TBD" && !manualDate) {
+          const eventDateParsed = smartParseDate(geminiDate);
+          if (eventDateParsed) {
+            const dayOfMonth = eventDateParsed.getDate();
+            const month = eventDateParsed.getMonth();
+            if (month === 0 && dayOfMonth === 1) { // January 1
+              if (preExtracted && preExtracted !== geminiDate) {
+                Logger.log("⚠️ Gemini returned suspicious Jan 1, replacing with: " + preExtracted);
+                result.eventDate = preExtracted;
+              } else {
+                Logger.log("⚠️ Gemini returned Jan 1 (likely default). Content may lack clear dates.");
+              }
+            }
+          }
+        }
+        
         return { result: result, error: null };
       }
     }
